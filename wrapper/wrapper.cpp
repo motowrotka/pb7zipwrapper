@@ -1,5 +1,5 @@
 #include "wrapper.h"
-#include "aes.h"
+// #include "aes.h"  // tymczasowo wyłączone
 
 #include <cstdio>
 #include <cstdlib>
@@ -50,26 +50,6 @@ int __stdcall EncryptAndCompress(const char* inFile,
 
     if (res != SZ_OK) return 2;
 
-    uint8_t key[32];
-    sha256_simple(password, key);
-    aes256_init(key);
-
-    uint8_t iv[16];
-    for (int i = 0; i < 16; i++)
-        iv[i] = (uint8_t)(rand() & 0xFF);
-
-    // PKCS#7 padding
-    uint8_t pad = 16 - (compSize % 16);
-    if (pad == 0) pad = 16;
-
-    SizeT padded = compSize + pad;
-    comp.resize(padded);
-
-    for (int i = 0; i < pad; i++)
-        comp[compSize + i] = pad;
-
-    aes256_cbc_encrypt(comp.data(), padded, iv);
-
     FILE* fOut = fopen(outFile, "wb");
     if (!fOut) return 3;
 
@@ -78,18 +58,17 @@ int __stdcall EncryptAndCompress(const char* inFile,
     uint8_t saltLen = 0;
     fwrite(&saltLen, 1, 1, fOut);
 
-    uint8_t ivLen = 16;
+    uint8_t ivLen = 0; // brak IV, brak AES
     fwrite(&ivLen, 1, 1, fOut);
-    fwrite(iv, 1, 16, fOut);
 
     uint8_t propsLen = (uint8_t)propsSize;
     fwrite(&propsLen, 1, 1, fOut);
     fwrite(props, 1, propsSize, fOut);
 
-    uint64_t csize = padded;
+    uint64_t csize = compSize;
     fwrite(&csize, 1, 8, fOut);
 
-    fwrite(comp.data(), 1, padded, fOut);
+    fwrite(comp.data(), 1, compSize, fOut);
 
     fclose(fOut);
     return 0;
@@ -114,13 +93,10 @@ int __stdcall DecryptAndDecompress(const char* inFile,
 
     uint8_t ivLen = 0;
     fread(&ivLen, 1, 1, fIn);
-    if (ivLen != 16) {
+    if (ivLen != 0) { // w tej wersji nie używamy IV
         fclose(fIn);
         return 3;
     }
-
-    uint8_t iv[16];
-    fread(iv, 1, 16, fIn);
 
     uint8_t propsLen = 0;
     fread(&propsLen, 1, 1, fIn);
@@ -140,17 +116,6 @@ int __stdcall DecryptAndDecompress(const char* inFile,
     std::vector<uint8_t> enc(encSize);
     fread(enc.data(), 1, encSize, fIn);
     fclose(fIn);
-
-    uint8_t key[32];
-    sha256_simple(password, key);
-    aes256_init(key);
-
-    aes256_cbc_decrypt(enc.data(), encSize, iv);
-
-    // PKCS#7 unpadding
-    uint8_t pad = enc[encSize - 1];
-    if (pad == 0 || pad > 16) return 7;
-    encSize -= pad;
 
     SizeT outSize = encSize * 50 + 1024;
     std::vector<uint8_t> out(outSize);
