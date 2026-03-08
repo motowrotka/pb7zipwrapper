@@ -128,11 +128,9 @@ int __stdcall DecryptAndDecompress(const char* inFile,
     uint8_t props[5];
     fread(props, 1, 5, fIn);
 
-    // rozmiar zaszyfrowanych danych zapisany jako uint64_t
     uint64_t encSize64 = 0;
     fread(&encSize64, 1, 8, fIn);
 
-    // LZMA używa SizeT (z LzmaLib.h)
     SizeT encSize = (SizeT)encSize64;
 
     std::vector<uint8_t> enc(encSize);
@@ -145,7 +143,11 @@ int __stdcall DecryptAndDecompress(const char* inFile,
 
     aes256_cbc_decrypt(enc.data(), encSize, iv);
 
-    SizeT outSize = encSize * 20;
+    uint8_t pad = enc[encSize - 1];
+    if (pad == 0 || pad > 16) return 7;
+    encSize -= pad;
+
+    SizeT outSize = encSize * 50 + 1024;
     std::vector<uint8_t> out(outSize);
     SizeT outProcessed = outSize;
 
