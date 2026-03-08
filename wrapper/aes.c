@@ -1,9 +1,13 @@
 #include "aes.h"
 #include <string.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 static uint8_t roundKey[240];
+
 static const uint8_t sbox[256] = {
-  // standard AES S-box
   0x63,0x7c,0x77,0x7b,0xf2,0x6b,0x6f,0xc5,0x30,0x01,0x67,0x2b,0xfe,0xd7,0xab,0x76,
   0xca,0x82,0xc9,0x7d,0xfa,0x59,0x47,0xf0,0xad,0xd4,0xa2,0xaf,0x9c,0xa4,0x72,0xc0,
   0xb7,0xfd,0x93,0x26,0x36,0x3f,0xf7,0xcc,0x34,0xa5,0xe5,0xf1,0x71,0xd8,0x31,0x15,
@@ -23,14 +27,13 @@ static const uint8_t sbox[256] = {
 };
 
 static const uint8_t Rcon[255] = {
-  0x8d,0x01,0x02,0x04,0x08,0x10,0x20,0x40,0x80,0x1b,0x36,
-  // reszta nieużywana
+  0x8d,0x01,0x02,0x04,0x08,0x10,0x20,0x40,0x80,0x1b,0x36
+  /* reszta zostaje domyślnie wyzerowana */
 };
 
 static void KeyExpansion(const uint8_t* key) {
     memcpy(roundKey, key, 32);
     uint8_t temp[4];
-    int i = 8;
     int bytesGenerated = 32;
     int rconIter = 1;
 
@@ -95,13 +98,13 @@ static void MixColumns(uint8_t* state) {
     for (int i = 0; i < 16; i += 4) {
         t = state[i];
         Tmp = state[i] ^ state[i+1] ^ state[i+2] ^ state[i+3];
-        Tm = state[i] ^ state[i+1]; Tm = (Tm<<1) ^ ((Tm & 0x80) ? 0x1b : 0);
+        Tm = state[i] ^ state[i+1]; Tm = (uint8_t)((Tm<<1) ^ ((Tm & 0x80) ? 0x1b : 0));
         state[i] ^= Tm ^ Tmp;
-        Tm = state[i+1] ^ state[i+2]; Tm = (Tm<<1) ^ ((Tm & 0x80) ? 0x1b : 0);
+        Tm = state[i+1] ^ state[i+2]; Tm = (uint8_t)((Tm<<1) ^ ((Tm & 0x80) ? 0x1b : 0));
         state[i+1] ^= Tm ^ Tmp;
-        Tm = state[i+2] ^ state[i+3]; Tm = (Tm<<1) ^ ((Tm & 0x80) ? 0x1b : 0);
+        Tm = state[i+2] ^ state[i+3]; Tm = (uint8_t)((Tm<<1) ^ ((Tm & 0x80) ? 0x1b : 0));
         state[i+2] ^= Tm ^ Tmp;
-        Tm = state[i+3] ^ t; Tm = (Tm<<1) ^ ((Tm & 0x80) ? 0x1b : 0);
+        Tm = state[i+3] ^ t; Tm = (uint8_t)((Tm<<1) ^ ((Tm & 0x80) ? 0x1b : 0));
         state[i+3] ^= Tm ^ Tmp;
     }
 }
@@ -120,8 +123,7 @@ void aes256_encrypt_block(uint8_t* block) {
 }
 
 void aes256_decrypt_block(uint8_t* block) {
-    // dla opcji A nie implementujemy deszyfrowania blokowego (CBC i tak działa)
-    // ale dla kompletności można dodać później
+    /* dla opcji A zostawiamy niezaimplementowane – nie używamy bezpośrednio */
 }
 
 void aes256_cbc_encrypt(uint8_t* data, size_t len, const uint8_t* iv) {
@@ -138,5 +140,10 @@ void aes256_cbc_encrypt(uint8_t* data, size_t len, const uint8_t* iv) {
 }
 
 void aes256_cbc_decrypt(uint8_t* data, size_t len, const uint8_t* iv) {
-    // dla opcji A nie implementujemy deszyfrowania CBC (można dodać później)
+    /* do zaimplementowania, gdy będziemy robić DecryptAndDecompress */
 }
+
+#ifdef __cplusplus
+}
+#endif
+
