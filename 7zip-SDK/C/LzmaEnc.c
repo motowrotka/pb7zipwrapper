@@ -2,6 +2,7 @@
 Igor Pavlov : Public domain */
 
 #include "Precomp.h"
+#define _7ZIP_ST 1
 
 #include <string.h>
 
@@ -3148,3 +3149,4 @@ void LzmaEnc_GetLzThreads(CLzmaEncHandle p, HANDLE lz_threads[2])
 }
 #endif
 */
+
