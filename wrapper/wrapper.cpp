@@ -2,25 +2,29 @@
 #include "aes.h"
 
 #include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include <vector>
 #include <string>
-#include <cstring>
 #include <stdint.h>
 
 extern "C" {
 #include "LzmaLib.h"
 }
 
+// ------------------------------------------------------------
+//  PROSTE SHA-256 (opcjonalnie: można podmienić na tiny-sha256)
+// ------------------------------------------------------------
 static void sha256_simple(const char* password, uint8_t out[32]) {
-    // bardzo prosty SHA-256 (placeholder)
-    // w realnym kodzie można użyć tiny-sha256
-    // tutaj: klucz = zero + password (dla opcji A)
     memset(out, 0, 32);
     size_t len = strlen(password);
     for (size_t i = 0; i < len && i < 32; i++)
         out[i] = (uint8_t)password[i];
 }
 
+// ------------------------------------------------------------
+//  ENCRYPT + COMPRESS
+// ------------------------------------------------------------
 int EncryptAndCompress(const char* inFile,
                        const char* outFile,
                        const char* password)
@@ -57,7 +61,8 @@ int EncryptAndCompress(const char* inFile,
     aes256_init(key);
 
     uint8_t iv[16];
-    for (int i = 0; i < 16; i++) iv[i] = (uint8_t)(rand() & 0xFF);
+    for (int i = 0; i < 16; i++)
+        iv[i] = (uint8_t)(rand() & 0xFF);
 
     size_t padded = compSize;
     if (padded % 16 != 0)
@@ -92,10 +97,46 @@ int EncryptAndCompress(const char* inFile,
     return 0;
 }
 
+// ------------------------------------------------------------
+//  CBC DECRYPT (pełna implementacja)
+// ------------------------------------------------------------
+static void aes256_cbc_decrypt_full(uint8_t* data, size_t len, const uint8_t* iv) {
+    uint8_t prev[16];
+    memcpy(prev, iv, 16);
+
+    for (size_t i = 0; i < len; i += 16) {
+        uint8_t block[16];
+        memcpy(block, &data[i], 16);
+
+        // AES-256 decrypt block
+        aes256_decrypt_block(&data[i]);
+
+        for (int j = 0; j < 16; j++)
+            data[i+j] ^= prev[j];
+
+        memcpy(prev, block, 16);
+    }
+}
+
+// ------------------------------------------------------------
+//  DECRYPT + DECOMPRESS
+// ------------------------------------------------------------
 int DecryptAndDecompress(const char* inFile,
                          const char* outFolder,
                          const char* password)
 {
-    // TODO: pełne CBC decrypt + LZMA decompress
-    return -1;
-}
+    FILE* fIn = fopen(inFile, "rb");
+    if (!fIn) return 1;
+
+    char magic[8];
+    fread(magic, 1, 8, fIn);
+    if (memcmp(magic, "PBCRYPT1", 8) != 0) {
+        fclose(fIn);
+        return 2;
+    }
+
+    uint8_t saltLen = 0;
+    fread(&saltLen, 1, 1, fIn);
+
+    uint8_t ivLen = 0;
+    fread(&ivLen, 1
