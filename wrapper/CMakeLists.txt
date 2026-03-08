@@ -1,16 +1,17 @@
 cmake_minimum_required(VERSION 3.20)
 project(PbCryptoLzma C CXX)
 
+# Globalnie wymuszamy tryb single-thread w LZMA SDK
+add_definitions(-D_7ZIP_ST)
+
 add_library(PbCryptoLzma SHARED
     wrapper.cpp
 
-    # LZMA SDK (C) – komplet wymaganych plików
+    # LZMA SDK (C) – tylko pliki single-thread
     ../7zip-SDK/C/LzmaEnc.c
     ../7zip-SDK/C/LzmaDec.c
     ../7zip-SDK/C/LzmaLib.c
     ../7zip-SDK/C/LzFind.c
-    ../7zip-SDK/C/LzFindMt.c
-    ../7zip-SDK/C/Threads.c
     ../7zip-SDK/C/Alloc.c
     ../7zip-SDK/C/7zCrc.c
     ../7zip-SDK/C/7zCrcOpt.c
