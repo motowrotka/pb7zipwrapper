@@ -1,12 +1,12 @@
 cmake_minimum_required(VERSION 3.20)
-project(PbCryptoLzma C CXX)
+project(PbCryptoLzma C)
 
-# Wymuszenie 32-bitowej kompilacji (ważne dla PB9)
+# Wymuszenie 32-bitowej kompilacji
 if(NOT CMAKE_GENERATOR_PLATFORM)
     set(CMAKE_GENERATOR_PLATFORM Win32)
 endif()
 
-# Wymuszenie statycznego runtime /MT zamiast /MD
+# Wymuszenie statycznego runtime (/MT)
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 
 add_library(PbCryptoLzma SHARED
@@ -33,7 +33,7 @@ target_include_directories(PbCryptoLzma PRIVATE
 
 target_compile_definitions(PbCryptoLzma PRIVATE _CRT_SECURE_NO_WARNINGS)
 
-# Wymuszenie eksportu funkcji bez dekoracji
+# Automatyczny eksport funkcji C
 set_target_properties(PbCryptoLzma PROPERTIES
     OUTPUT_NAME "PbCryptoLzma"
     WINDOWS_EXPORT_ALL_SYMBOLS ON
