@@ -3,7 +3,8 @@ project(SevenZipWrapper)
 
 set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
 
-include_directories(${CMAKE_SOURCE_DIR}/7zip-sdk/CPP)
+include_directories(${CMAKE_SOURCE_DIR}/7zip-SDK)
+
 
 add_library(SevenZipWrapper SHARED
     wrapper/wrapper.cpp
