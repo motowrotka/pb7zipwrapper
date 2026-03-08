@@ -129,7 +129,9 @@ int DecryptAndDecompress(const char* inFile,
     fread(props, 1, 5, fIn);
 
     uint64_t encSize = 0;
-    fread(&encSize, 1, 8, fIn);
+    fread(&encSize64, 1, 8, fIn);
+    
+    SizeT encSize = (SizeT)encSize64;   // 32-bit na Win32
 
     std::vector<uint8_t> enc(encSize);
     fread(enc.data(), 1, encSize, fIn);
