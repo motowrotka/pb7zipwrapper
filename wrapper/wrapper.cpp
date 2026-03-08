@@ -13,7 +13,7 @@ extern "C" {
 }
 
 // ------------------------------------------------------------
-//  PROSTE SHA-256 (opcjonalnie: można podmienić na tiny-sha256)
+//  PROSTE SHA-256 (placeholder dla opcji A)
 // ------------------------------------------------------------
 static void sha256_simple(const char* password, uint8_t out[32]) {
     memset(out, 0, 32);
@@ -108,7 +108,6 @@ static void aes256_cbc_decrypt_full(uint8_t* data, size_t len, const uint8_t* iv
         uint8_t block[16];
         memcpy(block, &data[i], 16);
 
-        // AES-256 decrypt block
         aes256_decrypt_block(&data[i]);
 
         for (int j = 0; j < 16; j++)
@@ -139,4 +138,17 @@ int DecryptAndDecompress(const char* inFile,
     fread(&saltLen, 1, 1, fIn);
 
     uint8_t ivLen = 0;
-    fread(&ivLen, 1
+    fread(&ivLen, 1, 1, fIn);
+    if (ivLen != 16) {
+        fclose(fIn);
+        return 3;
+    }
+
+    uint8_t iv[16];
+    fread(iv, 1, 16, fIn);
+
+    uint8_t propsLen = 0;
+    fread(&propsLen, 1, 1, fIn);
+    if (propsLen != 5) {
+        fclose(fIn);
+        return
