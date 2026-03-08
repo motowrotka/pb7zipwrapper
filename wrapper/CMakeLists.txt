@@ -11,7 +11,6 @@ set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 
 add_library(PbCryptoLzma SHARED
     wrapper.cpp
-    aes.c
 
     ../7zip-SDK/C/LzmaEnc.c
     ../7zip-SDK/C/LzmaDec.c
