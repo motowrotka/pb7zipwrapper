@@ -58,11 +58,15 @@ int __stdcall EncryptAndCompress(const char* inFile,
     for (int i = 0; i < 16; i++)
         iv[i] = (uint8_t)(rand() & 0xFF);
 
-    SizeT padded = compSize;
-    if (padded % 16 != 0)
-        padded += 16 - (padded % 16);
+    // PKCS#7 padding
+    uint8_t pad = 16 - (compSize % 16);
+    if (pad == 0) pad = 16;
 
-    comp.resize(padded, 0);
+    SizeT padded = compSize + pad;
+    comp.resize(padded);
+
+    for (int i = 0; i < pad; i++)
+        comp[compSize + i] = pad;
 
     aes256_cbc_encrypt(comp.data(), padded, iv);
 
@@ -143,6 +147,7 @@ int __stdcall DecryptAndDecompress(const char* inFile,
 
     aes256_cbc_decrypt(enc.data(), encSize, iv);
 
+    // PKCS#7 unpadding
     uint8_t pad = enc[encSize - 1];
     if (pad == 0 || pad > 16) return 7;
     encSize -= pad;
