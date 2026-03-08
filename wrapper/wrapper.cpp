@@ -95,7 +95,7 @@ int __stdcall EncryptAndCompress(const char* inFile,
 }
 
 int __stdcall DecryptAndDecompress(const char* inFile,
-                                   const char* outFolder,
+                                   const char* outFile,
                                    const char* password)
 {
     FILE* fIn = fopen(inFile, "rb");
@@ -167,9 +167,7 @@ int __stdcall DecryptAndDecompress(const char* inFile,
 
     if (res != SZ_OK) return 5;
 
-    std::string outPath = std::string(outFolder) + "/output.bin";
-
-    FILE* fOut = fopen(outPath.c_str(), "wb");
+    FILE* fOut = fopen(outFile, "wb");
     if (!fOut) return 6;
 
     fwrite(out.data(), 1, outProcessed, fOut);
