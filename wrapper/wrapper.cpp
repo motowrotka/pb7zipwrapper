@@ -12,7 +12,6 @@ extern "C" {
 #include "LzmaLib.h"
 }
 
-// Prosty "hash" hasła do 32 bajtów
 static void sha256_simple(const char* password, uint8_t out[32]) {
     memset(out, 0, 32);
     size_t len = strlen(password);
@@ -20,7 +19,6 @@ static void sha256_simple(const char* password, uint8_t out[32]) {
         out[i] = (uint8_t)password[i];
 }
 
-// ENCRYPT + COMPRESS
 int __stdcall EncryptAndCompress(const char* inFile,
                                  const char* outFile,
                                  const char* password)
@@ -31,11 +29,7 @@ int __stdcall EncryptAndCompress(const char* inFile,
     fseek(fIn, 0, SEEK_END);
     long inSizeLong = ftell(fIn);
     fseek(fIn, 0, SEEK_SET);
-
-    if (inSizeLong < 0) {
-        fclose(fIn);
-        return 1;
-    }
+    if (inSizeLong < 0) { fclose(fIn); return 1; }
 
     SizeT inSize = (SizeT)inSizeLong;
 
@@ -61,9 +55,6 @@ int __stdcall EncryptAndCompress(const char* inFile,
         5, 0, 3, 0, 2, 32, 1
     );
     if (res != SZ_OK) return 2;
-
-    // rozmiar strumienia LZMA przed AES
-    uint64_t lzmaSizeBeforeAES = (uint64_t)compSize;
 
     // AES key
     uint8_t key[32];
@@ -106,8 +97,6 @@ int __stdcall EncryptAndCompress(const char* inFile,
     uint64_t origSize64 = (uint64_t)inSize;
     fwrite(&origSize64, 1, 8, fOut);
 
-    fwrite(&lzmaSizeBeforeAES, 1, 8, fOut);
-
     uint64_t encSize64 = (uint64_t)padded;
     fwrite(&encSize64, 1, 8, fOut);
 
@@ -117,7 +106,6 @@ int __stdcall EncryptAndCompress(const char* inFile,
     return 0;
 }
 
-// DECRYPT + DECOMPRESS
 int __stdcall DecryptAndDecompress(const char* inFile,
                                    const char* outFile,
                                    const char* password)
@@ -161,15 +149,11 @@ int __stdcall DecryptAndDecompress(const char* inFile,
     uint64_t origSize64 = 0;
     fread(&origSize64, 1, 8, fIn);
 
-    uint64_t lzmaSizeBeforeAES64 = 0;
-    fread(&lzmaSizeBeforeAES64, 1, 8, fIn);
-
     uint64_t encSize64 = 0;
     fread(&encSize64, 1, 8, fIn);
 
     SizeT origSize = (SizeT)origSize64;
     SizeT encSize  = (SizeT)encSize64;
-    SizeT lzmaSize = (SizeT)lzmaSizeBeforeAES64;
 
     std::vector<uint8_t> enc(encSize);
     if (fread(enc.data(), 1, encSize, fIn) != encSize) {
@@ -186,10 +170,10 @@ int __stdcall DecryptAndDecompress(const char* inFile,
     // AES CBC decrypt
     aes256_cbc_decrypt(enc.data(), encSize, iv);
 
-    // LZMA decompress – używamy dokładnie lzmaSizeBeforeAES
+    // LZMA decompress – używamy całego encSize po decrypt
     std::vector<uint8_t> out(origSize);
     SizeT outProcessed = origSize;
-    SizeT srcLen = lzmaSize;
+    SizeT srcLen = encSize;
 
     int res = LzmaUncompress(
         out.data(), &outProcessed,
