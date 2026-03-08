@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(PbCryptoLzma C)
+project(PbCryptoLzma C CXX)
 
 # Wymuszenie 32-bitowej kompilacji
 if(NOT CMAKE_GENERATOR_PLATFORM)
@@ -33,7 +33,6 @@ target_include_directories(PbCryptoLzma PRIVATE
 
 target_compile_definitions(PbCryptoLzma PRIVATE _CRT_SECURE_NO_WARNINGS)
 
-# Automatyczny eksport funkcji C
 set_target_properties(PbCryptoLzma PROPERTIES
     OUTPUT_NAME "PbCryptoLzma"
     WINDOWS_EXPORT_ALL_SYMBOLS ON
