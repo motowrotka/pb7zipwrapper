@@ -10,15 +10,18 @@ jobs:
     steps:
     - uses: actions/checkout@v3
 
-    - name: Configure
-      run: cmake -B build -A x64
+    - name: Configure (Win32 + static /MT)
+      run: cmake -S wrapper -B build -A Win32 -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded
 
     - name: Build
       run: cmake --build build --config Release
-      
+
+    - name: List output
+      run: dir build\Release
+
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
         name: PbCryptoLzma
-        path: build/wrapper/Release/*.dll
+        path: build/Release/PbCryptoLzma.dll
         if-no-files-found: error
