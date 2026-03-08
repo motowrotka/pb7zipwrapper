@@ -1,19 +1,20 @@
 #include <windows.h>
 #include <string>
 
-#include "../7zip-SDK/Common/MyCom.h"
-#include "../7zip-SDK/Common/MyInitGuid.h"
-#include "../7zip-SDK/Common/FileStreams.h"
-#include "../7zip-SDK/Common/IntToString.h"
-#include "../7zip-SDK/Common/UTFConvert.h"
+#include "MyCom.h"
+#include "MyInitGuid.h"
+#include "FileStreams.h"
+#include "IntToString.h"
+#include "UTFConvert.h"
 
-#include "../7zip-SDK/7zip/Archive/7z/7zHandler.h"
-#include "../7zip-SDK/7zip/Archive/7z/7zIn.h"
-#include "../7zip-SDK/7zip/Archive/7z/7zOut.h"
+#include "7zHandler.h"
+#include "7zIn.h"
+#include "7zOut.h"
 
-#include "../7zip-SDK/7zip/Common/ArchiveOpenCallback.h"
-#include "../7zip-SDK/7zip/Common/ArchiveExtractCallback.h"
-#include "../7zip-SDK/7zip/Common/ArchiveUpdateCallback.h"
+#include "ArchiveOpenCallback.h"
+#include "ArchiveExtractCallback.h"
+#include "ArchiveUpdateCallback.h"
+
 
 extern "C" __declspec(dllexport)
 int CompressAndEncryptFile(const char* inFile, const char* outFile, const char* password)
