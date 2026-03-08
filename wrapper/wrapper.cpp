@@ -12,9 +12,7 @@ extern "C" {
 #include "LzmaLib.h"
 }
 
-// ------------------------------------------------------------
-//  Prosty SHA256 placeholder (32 bajty z hasła)
-// ------------------------------------------------------------
+// Prosty "hash" hasła do 32 bajtów
 static void sha256_simple(const char* password, uint8_t out[32]) {
     memset(out, 0, 32);
     size_t len = strlen(password);
@@ -22,9 +20,7 @@ static void sha256_simple(const char* password, uint8_t out[32]) {
         out[i] = (uint8_t)password[i];
 }
 
-// ------------------------------------------------------------
-//  AES + LZMA: ENCRYPT
-// ------------------------------------------------------------
+// ENCRYPT + COMPRESS
 int __stdcall EncryptAndCompress(const char* inFile,
                                  const char* outFile,
                                  const char* password)
@@ -50,7 +46,7 @@ int __stdcall EncryptAndCompress(const char* inFile,
     }
     fclose(fIn);
 
-    // --- LZMA compress ---
+    // LZMA compress
     SizeT outBufSize = inSize + inSize / 3 + 128;
     std::vector<uint8_t> comp(outBufSize);
     SizeT compSize = outBufSize;
@@ -64,36 +60,33 @@ int __stdcall EncryptAndCompress(const char* inFile,
         props, &propsSize,
         5, 0, 3, 0, 2, 32, 1
     );
-
     if (res != SZ_OK) return 2;
 
-    // --- ZAPISUJEMY ROZMIAR STRUMIENIA LZMA PRZED AES ---
+    // rozmiar strumienia LZMA przed AES
     uint64_t lzmaSizeBeforeAES = (uint64_t)compSize;
 
-    // --- AES key ---
+    // AES key
     uint8_t key[32];
     sha256_simple(password, key);
     aes256_init(key);
 
-    // --- IV ---
+    // IV
     uint8_t iv[16];
     for (int i = 0; i < 16; i++)
         iv[i] = (uint8_t)(rand() & 0xFF);
 
-    // --- PKCS#7 padding ---
-    uint8_t pad = 16 - (compSize % 16);
-    if (pad == 0) pad = 16;
+    // zero padding do pełnego bloku 16
+    SizeT padded = compSize;
+    if (padded % 16 != 0) {
+        SizeT extra = 16 - (padded % 16);
+        padded += extra;
+    }
+    comp.resize(padded, 0);
 
-    SizeT padded = compSize + pad;
-    comp.resize(padded);
-
-    for (int i = 0; i < pad; i++)
-        comp[compSize + i] = pad;
-
-    // --- AES CBC encrypt ---
+    // AES CBC encrypt
     aes256_cbc_encrypt(comp.data(), padded, iv);
 
-    // --- Zapis pliku ---
+    // zapis pliku
     FILE* fOut = fopen(outFile, "wb");
     if (!fOut) return 3;
 
@@ -110,27 +103,21 @@ int __stdcall EncryptAndCompress(const char* inFile,
     fwrite(&propsLen, 1, 1, fOut);
     fwrite(props, 1, propsSize, fOut);
 
-    // oryginalny rozmiar
     uint64_t origSize64 = (uint64_t)inSize;
     fwrite(&origSize64, 1, 8, fOut);
 
-    // rozmiar LZMA PRZED AES
     fwrite(&lzmaSizeBeforeAES, 1, 8, fOut);
 
-    // rozmiar zaszyfrowany
     uint64_t encSize64 = (uint64_t)padded;
     fwrite(&encSize64, 1, 8, fOut);
 
-    // dane
     fwrite(comp.data(), 1, padded, fOut);
 
     fclose(fOut);
     return 0;
 }
 
-// ------------------------------------------------------------
-//  AES + LZMA: DECRYPT
-// ------------------------------------------------------------
+// DECRYPT + DECOMPRESS
 int __stdcall DecryptAndDecompress(const char* inFile,
                                    const char* outFile,
                                    const char* password)
@@ -185,38 +172,32 @@ int __stdcall DecryptAndDecompress(const char* inFile,
     SizeT lzmaSize = (SizeT)lzmaSizeBeforeAES64;
 
     std::vector<uint8_t> enc(encSize);
-    fread(enc.data(), 1, encSize, fIn);
+    if (fread(enc.data(), 1, encSize, fIn) != encSize) {
+        fclose(fIn);
+        return 1;
+    }
     fclose(fIn);
 
-    // --- AES key ---
+    // AES key
     uint8_t key[32];
     sha256_simple(password, key);
     aes256_init(key);
 
-    // --- AES CBC decrypt ---
+    // AES CBC decrypt
     aes256_cbc_decrypt(enc.data(), encSize, iv);
 
-    // --- PKCS#7 unpadding ---
-    uint8_t pad = enc[encSize - 1];
-    if (pad == 0 || pad > 16) return 7;
-    encSize -= pad;
-
-    // --- UWAGA: używamy DOKŁADNIE lzmaSizeBeforeAES ---
-    if (encSize < lzmaSize) return 7;
-
-    // --- LZMA decompress ---
+    // LZMA decompress – używamy dokładnie lzmaSizeBeforeAES
     std::vector<uint8_t> out(origSize);
     SizeT outProcessed = origSize;
+    SizeT srcLen = lzmaSize;
 
     int res = LzmaUncompress(
         out.data(), &outProcessed,
-        enc.data(), &lzmaSize,
+        enc.data(), &srcLen,
         props, 5
     );
-
     if (res != SZ_OK) return 5;
 
-    // --- zapis pliku wynikowego ---
     FILE* fOut = fopen(outFile, "wb");
     if (!fOut) return 6;
 
