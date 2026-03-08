@@ -1,5 +1,5 @@
 #include "wrapper.h"
-// #include "aes.h"  // tymczasowo wyłączone
+// AES na razie wyłączony – najpierw ustabilizujemy LZMA
 
 #include <cstdio>
 #include <cstdlib>
@@ -27,14 +27,24 @@ int __stdcall EncryptAndCompress(const char* inFile,
     if (!fIn) return 1;
 
     fseek(fIn, 0, SEEK_END);
-    long inSize = ftell(fIn);
+    long inSizeLong = ftell(fIn);
     fseek(fIn, 0, SEEK_SET);
 
+    if (inSizeLong < 0) {
+        fclose(fIn);
+        return 1;
+    }
+
+    SizeT inSize = (SizeT)inSizeLong;
+
     std::vector<uint8_t> inBuf(inSize);
-    fread(inBuf.data(), 1, inSize, fIn);
+    if (fread(inBuf.data(), 1, inSize, fIn) != inSize) {
+        fclose(fIn);
+        return 1;
+    }
     fclose(fIn);
 
-    SizeT outBufSize = (SizeT)(inSize + inSize / 3 + 128);
+    SizeT outBufSize = inSize + inSize / 3 + 128;
     std::vector<uint8_t> comp(outBufSize);
     SizeT compSize = outBufSize;
 
@@ -43,7 +53,7 @@ int __stdcall EncryptAndCompress(const char* inFile,
 
     int res = LzmaCompress(
         comp.data(), &compSize,
-        inBuf.data(), (SizeT)inSize,
+        inBuf.data(), inSize,
         props, &propsSize,
         5, 0, 3, 0, 2, 32, 1
     );
@@ -53,21 +63,31 @@ int __stdcall EncryptAndCompress(const char* inFile,
     FILE* fOut = fopen(outFile, "wb");
     if (!fOut) return 3;
 
+    // magic
     fwrite("PBCRYPT1", 1, 8, fOut);
 
+    // saltLen (0 – brak)
     uint8_t saltLen = 0;
     fwrite(&saltLen, 1, 1, fOut);
 
-    uint8_t ivLen = 0; // brak IV, brak AES
+    // ivLen (0 – brak AES)
+    uint8_t ivLen = 0;
     fwrite(&ivLen, 1, 1, fOut);
 
-    uint8_t propsLen = (uint8_t)propsSize;
+    // props
+    uint8_t propsLen = (uint8_t)propsSize; // powinno być 5
     fwrite(&propsLen, 1, 1, fOut);
     fwrite(props, 1, propsSize, fOut);
 
-    uint64_t csize = compSize;
-    fwrite(&csize, 1, 8, fOut);
+    // oryginalny rozmiar
+    uint64_t origSize64 = (uint64_t)inSize;
+    fwrite(&origSize64, 1, 8, fOut);
 
+    // rozmiar skompresowany
+    uint64_t compSize64 = (uint64_t)compSize;
+    fwrite(&compSize64, 1, 8, fOut);
+
+    // dane skompresowane
     fwrite(comp.data(), 1, compSize, fOut);
 
     fclose(fOut);
@@ -82,7 +102,10 @@ int __stdcall DecryptAndDecompress(const char* inFile,
     if (!fIn) return 1;
 
     char magic[8];
-    fread(magic, 1, 8, fIn);
+    if (fread(magic, 1, 8, fIn) != 8) {
+        fclose(fIn);
+        return 1;
+    }
     if (memcmp(magic, "PBCRYPT1", 8) != 0) {
         fclose(fIn);
         return 2;
@@ -93,7 +116,7 @@ int __stdcall DecryptAndDecompress(const char* inFile,
 
     uint8_t ivLen = 0;
     fread(&ivLen, 1, 1, fIn);
-    if (ivLen != 0) { // w tej wersji nie używamy IV
+    if (ivLen != 0) {
         fclose(fIn);
         return 3;
     }
@@ -106,20 +129,35 @@ int __stdcall DecryptAndDecompress(const char* inFile,
     }
 
     uint8_t props[5];
-    fread(props, 1, 5, fIn);
+    if (fread(props, 1, 5, fIn) != 5) {
+        fclose(fIn);
+        return 1;
+    }
 
-    uint64_t encSize64 = 0;
-    fread(&encSize64, 1, 8, fIn);
+    uint64_t origSize64 = 0;
+    if (fread(&origSize64, 1, 8, fIn) != 8) {
+        fclose(fIn);
+        return 1;
+    }
 
-    SizeT encSize = (SizeT)encSize64;
+    uint64_t compSize64 = 0;
+    if (fread(&compSize64, 1, 8, fIn) != 8) {
+        fclose(fIn);
+        return 1;
+    }
+
+    SizeT origSize = (SizeT)origSize64;
+    SizeT encSize  = (SizeT)compSize64;
 
     std::vector<uint8_t> enc(encSize);
-    fread(enc.data(), 1, encSize, fIn);
+    if (fread(enc.data(), 1, encSize, fIn) != encSize) {
+        fclose(fIn);
+        return 1;
+    }
     fclose(fIn);
 
-    SizeT outSize = encSize * 50 + 1024;
-    std::vector<uint8_t> out(outSize);
-    SizeT outProcessed = outSize;
+    std::vector<uint8_t> out(origSize);
+    SizeT outProcessed = origSize;
 
     int res = LzmaUncompress(
         out.data(), &outProcessed,
