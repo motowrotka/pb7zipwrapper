@@ -3,14 +3,14 @@ project(PbCryptoLzma C CXX)
 
 add_library(PbCryptoLzma SHARED
     wrapper.cpp
+    aes.c
 
-    # LZMA SDK (C) – wariant MT z pełnym zestawem plików
     ../7zip-SDK/C/LzmaEnc.c
     ../7zip-SDK/C/LzmaDec.c
     ../7zip-SDK/C/LzmaLib.c
     ../7zip-SDK/C/LzFind.c
     ../7zip-SDK/C/LzFindMt.c
-    ../7zip-SDK/C/LzFindOpt.c      # <-- ten plik musi istnieć w Twoim repo
+    ../7zip-SDK/C/LzFindOpt.c
     ../7zip-SDK/C/Threads.c
     ../7zip-SDK/C/Alloc.c
     ../7zip-SDK/C/7zCrc.c
@@ -23,7 +23,6 @@ target_include_directories(PbCryptoLzma PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../7zip-SDK/C
 )
 
-# Wyłączamy ostrzeżenia o fopen
 target_compile_definitions(PbCryptoLzma PRIVATE _CRT_SECURE_NO_WARNINGS)
 
 set_target_properties(PbCryptoLzma PROPERTIES
