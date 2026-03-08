@@ -98,7 +98,7 @@ int EncryptAndCompress(const char* inFile,
 }
 
 // ------------------------------------------------------------
-//  CBC DECRYPT (pełna implementacja)
+//  CBC DECRYPT
 // ------------------------------------------------------------
 static void aes256_cbc_decrypt_full(uint8_t* data, size_t len, const uint8_t* iv) {
     uint8_t prev[16];
@@ -151,4 +151,45 @@ int DecryptAndDecompress(const char* inFile,
     fread(&propsLen, 1, 1, fIn);
     if (propsLen != 5) {
         fclose(fIn);
-        return
+        return 4;
+    }
+
+    uint8_t props[5];
+    fread(props, 1, 5, fIn);
+
+    uint64_t encSize = 0;
+    fread(&encSize, 1, 8, fIn);
+
+    std::vector<uint8_t> enc(encSize);
+    fread(enc.data(), 1, encSize, fIn);
+    fclose(fIn);
+
+    uint8_t key[32];
+    sha256_simple(password, key);
+    aes256_init(key);
+
+    aes256_cbc_decrypt_full(enc.data(), encSize, iv);
+
+    size_t outSize = encSize * 20;
+    std::vector<uint8_t> out(outSize);
+
+    size_t outProcessed = outSize;
+
+    int res = LzmaUncompress(
+        out.data(), &outProcessed,
+        enc.data(), &encSize,
+        props, 5
+    );
+
+    if (res != SZ_OK) return 5;
+
+    std::string outPath = std::string(outFolder) + "/output.bin";
+
+    FILE* fOut = fopen(outPath.c_str(), "wb");
+    if (!fOut) return 6;
+
+    fwrite(out.data(), 1, outProcessed, fOut);
+    fclose(fOut);
+
+    return 0;
+}
