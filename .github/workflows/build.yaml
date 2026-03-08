@@ -17,7 +17,8 @@ jobs:
       run: cmake --build build --config Release
       
     - name: Upload artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: PbCryptoLzma
         path: build/wrapper/Release/*.dll
+        if-no-files-found: error
