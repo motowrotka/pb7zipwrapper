@@ -19,9 +19,9 @@ static void sha256_simple(const char* password, uint8_t out[32]) {
         out[i] = (uint8_t)password[i];
 }
 
-int EncryptAndCompress(const char* inFile,
-                       const char* outFile,
-                       const char* password)
+int __stdcall EncryptAndCompress(const char* inFile,
+                                 const char* outFile,
+                                 const char* password)
 {
     FILE* fIn = fopen(inFile, "rb");
     if (!fIn) return 1;
@@ -91,9 +91,9 @@ int EncryptAndCompress(const char* inFile,
     return 0;
 }
 
-int DecryptAndDecompress(const char* inFile,
-                         const char* outFolder,
-                         const char* password)
+int __stdcall DecryptAndDecompress(const char* inFile,
+                                   const char* outFolder,
+                                   const char* password)
 {
     FILE* fIn = fopen(inFile, "rb");
     if (!fIn) return 1;
