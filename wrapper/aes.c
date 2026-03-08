@@ -5,6 +5,9 @@
 extern "C" {
 #endif
 
+// ------------------------------------------------------------
+//  AES S-box
+// ------------------------------------------------------------
 static const uint8_t sbox[256] = {
   0x63,0x7c,0x77,0x7b,0xf2,0x6b,0x6f,0xc5,0x30,0x01,0x67,0x2b,0xfe,0xd7,0xab,0x76,
   0xca,0x82,0xc9,0x7d,0xfa,0x59,0x47,0xf0,0xad,0xd4,0xa2,0xaf,0x9c,0xa4,0x72,0xc0,
@@ -24,6 +27,9 @@ static const uint8_t sbox[256] = {
   0x8c,0xa1,0x89,0x0d,0xbf,0xe6,0x42,0x68,0x41,0x99,0x2d,0x0f,0xb0,0x54,0xbb,0x16
 };
 
+// ------------------------------------------------------------
+//  AES inverse S-box
+// ------------------------------------------------------------
 static const uint8_t inv_sbox[256] = {
   0x52,0x09,0x6a,0xd5,0x30,0x36,0xa5,0x38,0xbf,0x40,0xa3,0x9e,0x81,0xf3,0xd7,0xfb,
   0x7c,0xe3,0x39,0x82,0x9b,0x2f,0xff,0x87,0x34,0x8e,0x43,0x44,0xc4,0xde,0xe9,0xcb,
@@ -43,12 +49,18 @@ static const uint8_t inv_sbox[256] = {
   0x17,0x2b,0x04,0x7e,0xba,0x77,0xd6,0x26,0xe1,0x69,0x14,0x63,0x55,0x21,0x0c,0x7d
 };
 
+// ------------------------------------------------------------
+//  Round keys
+// ------------------------------------------------------------
 static uint8_t roundKey[240];
 
 static const uint8_t Rcon[11] = {
   0x00,0x01,0x02,0x04,0x08,0x10,0x20,0x40,0x80,0x1b,0x36
 };
 
+// ------------------------------------------------------------
+//  Key expansion
+// ------------------------------------------------------------
 static void KeyExpansion(const uint8_t* key) {
     memcpy(roundKey, key, 32);
     uint8_t temp[4];
@@ -78,6 +90,9 @@ void aes256_init(const uint8_t* key) {
     KeyExpansion(key);
 }
 
+// ------------------------------------------------------------
+//  AES core operations
+// ------------------------------------------------------------
 static void AddRoundKey(uint8_t* state, int round) {
     for (int i = 0; i < 16; i++)
         state[i] ^= roundKey[round * 16 + i];
@@ -86,6 +101,11 @@ static void AddRoundKey(uint8_t* state, int round) {
 static void SubBytes(uint8_t* state) {
     for (int i = 0; i < 16; i++)
         state[i] = sbox[state[i]];
+}
+
+static void InvSubBytes(uint8_t* state) {
+    for (int i = 0; i < 16; i++)
+        state[i] = inv_sbox[state[i]];
 }
 
 static void ShiftRows(uint8_t* state) {
@@ -111,35 +131,6 @@ static void ShiftRows(uint8_t* state) {
     state[7] = temp;
 }
 
-static void MixColumns(uint8_t* state) {
-    uint8_t Tmp, Tm, t;
-    for (int i = 0; i < 16; i += 4) {
-        t = state[i];
-        Tmp = state[i] ^ state[i+1] ^ state[i+2] ^ state[i+3];
-        Tm = state[i] ^ state[i+1]; Tm = (uint8_t)((Tm<<1) ^ ((Tm & 0x80) ? 0x1b : 0));
-        state[i] ^= Tm ^ Tmp;
-        Tm = state[i+1] ^ state[i+2]; Tm = (uint8_t)((Tm<<1) ^ ((Tm & 0x80) ? 0x1b : 0));
-        state[i+1] ^= Tm ^ Tmp;
-        Tm = state[i+2] ^ state[i+3]; Tm = (uint8_t)((Tm<<1) ^ ((Tm & 0x80) ? 0x1b : 0));
-        state[i+2] ^= Tm ^ Tmp;
-        Tm = state[i+3] ^ t; Tm = (uint8_t)((Tm<<1) ^ ((Tm & 0x80) ? 0x1b : 0));
-        state[i+3] ^= Tm ^ Tmp;
-    }
-}
-
-void aes256_encrypt_block(uint8_t* block) {
-    AddRoundKey(block, 0);
-    for (int round = 1; round <= 13; round++) {
-        SubBytes(block);
-        ShiftRows(block);
-        MixColumns(block);
-        AddRoundKey(block, round);
-    }
-    SubBytes(block);
-    ShiftRows(block);
-    AddRoundKey(block, 14);
-}
-
 static void InvShiftRows(uint8_t* state) {
     uint8_t temp;
 
@@ -163,9 +154,20 @@ static void InvShiftRows(uint8_t* state) {
     state[15] = temp;
 }
 
-static void InvSubBytes(uint8_t* state) {
-    for (int i = 0; i < 16; i++)
-        state[i] = inv_sbox[state[i]];
+static void MixColumns(uint8_t* state) {
+    uint8_t Tmp, Tm, t;
+    for (int i = 0; i < 16; i += 4) {
+        t = state[i];
+        Tmp = state[i] ^ state[i+1] ^ state[i+2] ^ state[i+3];
+        Tm = state[i] ^ state[i+1]; Tm = (uint8_t)((Tm<<1) ^ ((Tm & 0x80) ? 0x1b : 0));
+        state[i] ^= Tm ^ Tmp;
+        Tm = state[i+1] ^ state[i+2]; Tm = (uint8_t)((Tm<<1) ^ ((Tm & 0x80) ? 0x1b : 0));
+        state[i+1] ^= Tm ^ Tmp;
+        Tm = state[i+2] ^ state[i+3]; Tm = (uint8_t)((Tm<<1) ^ ((Tm & 0x80) ? 0x1b : 0));
+        state[i+2] ^= Tm ^ Tmp;
+        Tm = state[i+3] ^ t; Tm = (uint8_t)((Tm<<1) ^ ((Tm & 0x80) ? 0x1b : 0));
+        state[i+3] ^= Tm ^ Tmp;
+    }
 }
 
 static void InvMixColumns(uint8_t* state) {
@@ -183,6 +185,22 @@ static void InvMixColumns(uint8_t* state) {
     }
 }
 
+// ------------------------------------------------------------
+//  Encrypt / Decrypt block
+// ------------------------------------------------------------
+void aes256_encrypt_block(uint8_t* block) {
+    AddRoundKey(block, 0);
+    for (int round = 1; round <= 13; round++) {
+        SubBytes(block);
+        ShiftRows(block);
+        MixColumns(block);
+        AddRoundKey(block, round);
+    }
+    SubBytes(block);
+    ShiftRows(block);
+    AddRoundKey(block, 14);
+}
+
 void aes256_decrypt_block(uint8_t* block) {
     AddRoundKey(block, 14);
 
@@ -198,6 +216,9 @@ void aes256_decrypt_block(uint8_t* block) {
     AddRoundKey(block, 0);
 }
 
+// ------------------------------------------------------------
+//  CBC mode
+// ------------------------------------------------------------
 void aes256_cbc_encrypt(uint8_t* data, size_t len, const uint8_t* iv) {
     uint8_t buf[16];
     memcpy(buf, iv, 16);
