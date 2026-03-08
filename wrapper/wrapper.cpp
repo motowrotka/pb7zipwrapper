@@ -1,5 +1,5 @@
 #include "wrapper.h"
-// AES na razie wyłączony – najpierw ustabilizujemy LZMA
+#include "aes.h"
 
 #include <cstdio>
 #include <cstdlib>
@@ -12,6 +12,9 @@ extern "C" {
 #include "LzmaLib.h"
 }
 
+// ------------------------------------------------------------
+//  Prosty SHA256 placeholder (32 bajty z hasła)
+// ------------------------------------------------------------
 static void sha256_simple(const char* password, uint8_t out[32]) {
     memset(out, 0, 32);
     size_t len = strlen(password);
@@ -19,6 +22,9 @@ static void sha256_simple(const char* password, uint8_t out[32]) {
         out[i] = (uint8_t)password[i];
 }
 
+// ------------------------------------------------------------
+//  AES + LZMA: ENCRYPT
+// ------------------------------------------------------------
 int __stdcall EncryptAndCompress(const char* inFile,
                                  const char* outFile,
                                  const char* password)
@@ -44,6 +50,7 @@ int __stdcall EncryptAndCompress(const char* inFile,
     }
     fclose(fIn);
 
+    // --- LZMA compress ---
     SizeT outBufSize = inSize + inSize / 3 + 128;
     std::vector<uint8_t> comp(outBufSize);
     SizeT compSize = outBufSize;
@@ -60,22 +67,47 @@ int __stdcall EncryptAndCompress(const char* inFile,
 
     if (res != SZ_OK) return 2;
 
+    // --- AES key ---
+    uint8_t key[32];
+    sha256_simple(password, key);
+    aes256_init(key);
+
+    // --- IV ---
+    uint8_t iv[16];
+    for (int i = 0; i < 16; i++)
+        iv[i] = (uint8_t)(rand() & 0xFF);
+
+    // --- PKCS#7 padding ---
+    uint8_t pad = 16 - (compSize % 16);
+    if (pad == 0) pad = 16;
+
+    SizeT padded = compSize + pad;
+    comp.resize(padded);
+
+    for (int i = 0; i < pad; i++)
+        comp[compSize + i] = pad;
+
+    // --- AES CBC encrypt ---
+    aes256_cbc_encrypt(comp.data(), padded, iv);
+
+    // --- Zapis pliku ---
     FILE* fOut = fopen(outFile, "wb");
     if (!fOut) return 3;
 
     // magic
     fwrite("PBCRYPT1", 1, 8, fOut);
 
-    // saltLen (0 – brak)
+    // brak soli
     uint8_t saltLen = 0;
     fwrite(&saltLen, 1, 1, fOut);
 
-    // ivLen (0 – brak AES)
-    uint8_t ivLen = 0;
+    // IV
+    uint8_t ivLen = 16;
     fwrite(&ivLen, 1, 1, fOut);
+    fwrite(iv, 1, 16, fOut);
 
     // props
-    uint8_t propsLen = (uint8_t)propsSize; // powinno być 5
+    uint8_t propsLen = (uint8_t)propsSize;
     fwrite(&propsLen, 1, 1, fOut);
     fwrite(props, 1, propsSize, fOut);
 
@@ -83,17 +115,20 @@ int __stdcall EncryptAndCompress(const char* inFile,
     uint64_t origSize64 = (uint64_t)inSize;
     fwrite(&origSize64, 1, 8, fOut);
 
-    // rozmiar skompresowany
-    uint64_t compSize64 = (uint64_t)compSize;
-    fwrite(&compSize64, 1, 8, fOut);
+    // rozmiar zaszyfrowany
+    uint64_t encSize64 = (uint64_t)padded;
+    fwrite(&encSize64, 1, 8, fOut);
 
-    // dane skompresowane
-    fwrite(comp.data(), 1, compSize, fOut);
+    // dane
+    fwrite(comp.data(), 1, padded, fOut);
 
     fclose(fOut);
     return 0;
 }
 
+// ------------------------------------------------------------
+//  AES + LZMA: DECRYPT
+// ------------------------------------------------------------
 int __stdcall DecryptAndDecompress(const char* inFile,
                                    const char* outFile,
                                    const char* password)
@@ -116,10 +151,13 @@ int __stdcall DecryptAndDecompress(const char* inFile,
 
     uint8_t ivLen = 0;
     fread(&ivLen, 1, 1, fIn);
-    if (ivLen != 0) {
+    if (ivLen != 16) {
         fclose(fIn);
         return 3;
     }
+
+    uint8_t iv[16];
+    fread(iv, 1, 16, fIn);
 
     uint8_t propsLen = 0;
     fread(&propsLen, 1, 1, fIn);
@@ -129,33 +167,35 @@ int __stdcall DecryptAndDecompress(const char* inFile,
     }
 
     uint8_t props[5];
-    if (fread(props, 1, 5, fIn) != 5) {
-        fclose(fIn);
-        return 1;
-    }
+    fread(props, 1, 5, fIn);
 
     uint64_t origSize64 = 0;
-    if (fread(&origSize64, 1, 8, fIn) != 8) {
-        fclose(fIn);
-        return 1;
-    }
+    fread(&origSize64, 1, 8, fIn);
 
-    uint64_t compSize64 = 0;
-    if (fread(&compSize64, 1, 8, fIn) != 8) {
-        fclose(fIn);
-        return 1;
-    }
+    uint64_t encSize64 = 0;
+    fread(&encSize64, 1, 8, fIn);
 
     SizeT origSize = (SizeT)origSize64;
-    SizeT encSize  = (SizeT)compSize64;
+    SizeT encSize  = (SizeT)encSize64;
 
     std::vector<uint8_t> enc(encSize);
-    if (fread(enc.data(), 1, encSize, fIn) != encSize) {
-        fclose(fIn);
-        return 1;
-    }
+    fread(enc.data(), 1, encSize, fIn);
     fclose(fIn);
 
+    // --- AES key ---
+    uint8_t key[32];
+    sha256_simple(password, key);
+    aes256_init(key);
+
+    // --- AES CBC decrypt ---
+    aes256_cbc_decrypt(enc.data(), encSize, iv);
+
+    // --- PKCS#7 unpadding ---
+    uint8_t pad = enc[encSize - 1];
+    if (pad == 0 || pad > 16) return 7;
+    encSize -= pad;
+
+    // --- LZMA decompress ---
     std::vector<uint8_t> out(origSize);
     SizeT outProcessed = origSize;
 
@@ -167,6 +207,7 @@ int __stdcall DecryptAndDecompress(const char* inFile,
 
     if (res != SZ_OK) return 5;
 
+    // --- zapis pliku wynikowego ---
     FILE* fOut = fopen(outFile, "wb");
     if (!fOut) return 6;
 
