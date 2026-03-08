@@ -67,6 +67,9 @@ int __stdcall EncryptAndCompress(const char* inFile,
 
     if (res != SZ_OK) return 2;
 
+    // --- ZAPISUJEMY ROZMIAR STRUMIENIA LZMA PRZED AES ---
+    uint64_t lzmaSizeBeforeAES = (uint64_t)compSize;
+
     // --- AES key ---
     uint8_t key[32];
     sha256_simple(password, key);
@@ -94,19 +97,15 @@ int __stdcall EncryptAndCompress(const char* inFile,
     FILE* fOut = fopen(outFile, "wb");
     if (!fOut) return 3;
 
-    // magic
     fwrite("PBCRYPT1", 1, 8, fOut);
 
-    // brak soli
     uint8_t saltLen = 0;
     fwrite(&saltLen, 1, 1, fOut);
 
-    // IV
     uint8_t ivLen = 16;
     fwrite(&ivLen, 1, 1, fOut);
     fwrite(iv, 1, 16, fOut);
 
-    // props
     uint8_t propsLen = (uint8_t)propsSize;
     fwrite(&propsLen, 1, 1, fOut);
     fwrite(props, 1, propsSize, fOut);
@@ -114,6 +113,9 @@ int __stdcall EncryptAndCompress(const char* inFile,
     // oryginalny rozmiar
     uint64_t origSize64 = (uint64_t)inSize;
     fwrite(&origSize64, 1, 8, fOut);
+
+    // rozmiar LZMA PRZED AES
+    fwrite(&lzmaSizeBeforeAES, 1, 8, fOut);
 
     // rozmiar zaszyfrowany
     uint64_t encSize64 = (uint64_t)padded;
@@ -172,11 +174,15 @@ int __stdcall DecryptAndDecompress(const char* inFile,
     uint64_t origSize64 = 0;
     fread(&origSize64, 1, 8, fIn);
 
+    uint64_t lzmaSizeBeforeAES64 = 0;
+    fread(&lzmaSizeBeforeAES64, 1, 8, fIn);
+
     uint64_t encSize64 = 0;
     fread(&encSize64, 1, 8, fIn);
 
     SizeT origSize = (SizeT)origSize64;
     SizeT encSize  = (SizeT)encSize64;
+    SizeT lzmaSize = (SizeT)lzmaSizeBeforeAES64;
 
     std::vector<uint8_t> enc(encSize);
     fread(enc.data(), 1, encSize, fIn);
@@ -195,13 +201,16 @@ int __stdcall DecryptAndDecompress(const char* inFile,
     if (pad == 0 || pad > 16) return 7;
     encSize -= pad;
 
+    // --- UWAGA: używamy DOKŁADNIE lzmaSizeBeforeAES ---
+    if (encSize < lzmaSize) return 7;
+
     // --- LZMA decompress ---
     std::vector<uint8_t> out(origSize);
     SizeT outProcessed = origSize;
 
     int res = LzmaUncompress(
         out.data(), &outProcessed,
-        enc.data(), &encSize,
+        enc.data(), &lzmaSize,
         props, 5
     );
 
