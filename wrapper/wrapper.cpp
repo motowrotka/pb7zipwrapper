@@ -113,6 +113,13 @@ int __stdcall DecryptAndDecompress(const char* inFile,
     FILE* fIn = fopen(inFile, "rb");
     if (!fIn) return 1;
 
+    if (!aes256_selftest()) {
+    // AES jest uszkodzony / niezgodny z tym, co zakładamy
+    fclose(fIn);
+    return 9;
+    }
+
+
     char magic[8];
     if (fread(magic, 1, 8, fIn) != 8) {
         fclose(fIn);
