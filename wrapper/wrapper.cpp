@@ -99,64 +99,40 @@ int DecryptAndDecompress(const char* inFile,
     if (!fIn) return 1;
 
     char magic[8];
-    if (fread(magic, 1, 8, fIn) != 8) {
+    fread(magic, 1, 8, fIn);
+    if (memcmp(magic, "PBCRYPT1", 8) != 0) {
         fclose(fIn);
         return 2;
     }
-    if (memcmp(magic, "PBCRYPT1", 8) != 0) {
+
+    uint8_t saltLen = 0;
+    fread(&saltLen, 1, 1, fIn);
+
+    uint8_t ivLen = 0;
+    fread(&ivLen, 1, 1, fIn);
+    if (ivLen != 16) {
         fclose(fIn);
         return 3;
     }
 
-    uint8_t saltLen = 0;
-    if (fread(&saltLen, 1, 1, fIn) != 1) {
+    uint8_t iv[16];
+    fread(iv, 1, 16, fIn);
+
+    uint8_t propsLen = 0;
+    fread(&propsLen, 1, 1, fIn);
+    if (propsLen != 5) {
         fclose(fIn);
         return 4;
     }
 
-    uint8_t ivLen = 0;
-    if (fread(&ivLen, 1, 1, fIn) != 1) {
-        fclose(fIn);
-        return 5;
-    }
-    if (ivLen != 16) {
-        fclose(fIn);
-        return 6;
-    }
-
-    uint8_t iv[16];
-    if (fread(iv, 1, 16, fIn) != 16) {
-        fclose(fIn);
-        return 7;
-    }
-
-    uint8_t propsLen = 0;
-    if (fread(&propsLen, 1, 1, fIn) != 1) {
-        fclose(fIn);
-        return 8;
-    }
-    if (propsLen != 5) {
-        fclose(fIn);
-        return 9;
-    }
-
     uint8_t props[5];
-    if (fread(props, 1, 5, fIn) != 5) {
-        fclose(fIn);
-        return 10;
-    }
+    fread(props, 1, 5, fIn);
 
     uint64_t encSize = 0;
-    if (fread(&encSize, 1, 8, fIn) != 8) {
-        fclose(fIn);
-        return 11;
-    }
+    fread(&encSize, 1, 8, fIn);
 
     std::vector<uint8_t> enc(encSize);
-    if (fread(enc.data(), 1, encSize, fIn) != encSize) {
-        fclose(fIn);
-        return 12;
-    }
+    fread(enc.data(), 1, encSize, fIn);
     fclose(fIn);
 
     uint8_t key[32];
@@ -175,12 +151,12 @@ int DecryptAndDecompress(const char* inFile,
         props, 5
     );
 
-    if (res != SZ_OK) return 13;
+    if (res != SZ_OK) return 5;
 
     std::string outPath = std::string(outFolder) + "/output.bin";
 
     FILE* fOut = fopen(outPath.c_str(), "wb");
-    if (!fOut) return 14;
+    if (!fOut) return 6;
 
     fwrite(out.data(), 1, outProcessed, fOut);
     fclose(fOut);
