@@ -3,12 +3,14 @@ project(SevenZipWrapper)
 
 set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
 
+
 include_directories(
     ${CMAKE_SOURCE_DIR}/7zip-SDK
     ${CMAKE_SOURCE_DIR}/7zip-SDK/7zip
     ${CMAKE_SOURCE_DIR}/7zip-SDK/7zip/Archive
     ${CMAKE_SOURCE_DIR}/7zip-SDK/7zip/Archive/7z
     ${CMAKE_SOURCE_DIR}/7zip-SDK/7zip/Common
+    ${CMAKE_SOURCE_DIR}/7zip-SDK/7zip/UI/Common
     ${CMAKE_SOURCE_DIR}/7zip-SDK/Common
     ${CMAKE_SOURCE_DIR}/7zip-SDK/Windows
     ${CMAKE_SOURCE_DIR}/7zip-SDK/C
