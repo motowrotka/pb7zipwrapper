@@ -1,19 +1,23 @@
 #include <windows.h>
 #include <string>
 
+// Common
 #include "MyCom.h"
 #include "MyInitGuid.h"
 #include "FileStreams.h"
 #include "IntToString.h"
 #include "UTFConvert.h"
 
+// 7z archive
 #include "7zHandler.h"
 #include "7zIn.h"
 #include "7zOut.h"
 
+// Archive helpers
 #include "ArchiveOpenCallback.h"
 #include "ArchiveExtractCallback.h"
 #include "ArchiveUpdateCallback.h"
+
 
 
 extern "C" __declspec(dllexport)
