@@ -34,16 +34,16 @@ int EncryptAndCompress(const char* inFile,
     fread(inBuf.data(), 1, inSize, fIn);
     fclose(fIn);
 
-    size_t outBufSize = inSize + inSize/3 + 128;
+    SizeT outBufSize = (SizeT)(inSize + inSize / 3 + 128);
     std::vector<uint8_t> comp(outBufSize);
-    size_t compSize = outBufSize;
+    SizeT compSize = outBufSize;
 
     uint8_t props[5];
-    size_t propsSize = 5;
+    SizeT propsSize = 5;
 
     int res = LzmaCompress(
         comp.data(), &compSize,
-        inBuf.data(), inSize,
+        inBuf.data(), (SizeT)inSize,
         props, &propsSize,
         5, 0, 3, 0, 2, 32, 1
     );
@@ -58,7 +58,7 @@ int EncryptAndCompress(const char* inFile,
     for (int i = 0; i < 16; i++)
         iv[i] = (uint8_t)(rand() & 0xFF);
 
-    size_t padded = compSize;
+    SizeT padded = compSize;
     if (padded % 16 != 0)
         padded += 16 - (padded % 16);
 
@@ -128,10 +128,12 @@ int DecryptAndDecompress(const char* inFile,
     uint8_t props[5];
     fread(props, 1, 5, fIn);
 
-    uint64_t encSize = 0;
+    // rozmiar zaszyfrowanych danych zapisany jako uint64_t
+    uint64_t encSize64 = 0;
     fread(&encSize64, 1, 8, fIn);
-    
-    SizeT encSize = (SizeT)encSize64;   // 32-bit na Win32
+
+    // LZMA używa SizeT (z LzmaLib.h)
+    SizeT encSize = (SizeT)encSize64;
 
     std::vector<uint8_t> enc(encSize);
     fread(enc.data(), 1, encSize, fIn);
@@ -143,9 +145,9 @@ int DecryptAndDecompress(const char* inFile,
 
     aes256_cbc_decrypt(enc.data(), encSize, iv);
 
-    size_t outSize = encSize * 20;
+    SizeT outSize = encSize * 20;
     std::vector<uint8_t> out(outSize);
-    size_t outProcessed = outSize;
+    SizeT outProcessed = outSize;
 
     int res = LzmaUncompress(
         out.data(), &outProcessed,
